@@ -254,10 +254,14 @@ public class CameraServiceProxy extends SystemService
     private final ArrayMap<String, CameraUsageEvent> mActiveCameraUsage = new ArrayMap<>();
     private final List<CameraEvent> mCameraEventHistory = new ArrayList<CameraEvent>();
 
+    private static final String LIMIT_REFRESH_RATE_PROP = "debug.camera.limit_refresh_rate";
+    private final boolean mLimitRefreshRate;
+
     private static final String NFC_NOTIFICATION_PROP = "ro.camera.notify_nfc";
     private static final IBinder nfcInterfaceToken = new Binder();
 
     private final boolean mNotifyNfc;
+    private final boolean mAllowMediaUid;
 
     private ScheduledThreadPoolExecutor mLogWriterService = new ScheduledThreadPoolExecutor(
             /*corePoolSize*/ 1);
@@ -904,7 +908,8 @@ public class CameraServiceProxy extends SystemService
 
         @Override
         public void pingForUserUpdate() {
-            if (Binder.getCallingUid() != Process.CAMERASERVER_UID) {
+            if (Binder.getCallingUid() != Process.CAMERASERVER_UID
+                    && (!mAllowMediaUid || Binder.getCallingUid() != Process.MEDIA_UID)) {
                 Slog.e(TAG, "Calling UID: " + Binder.getCallingUid() + " doesn't match expected " +
                         " camera service UID!");
                 return;
@@ -915,7 +920,8 @@ public class CameraServiceProxy extends SystemService
 
         @Override
         public void notifyCameraState(CameraSessionStats cameraState) {
-            if (Binder.getCallingUid() != Process.CAMERASERVER_UID) {
+            if (Binder.getCallingUid() != Process.CAMERASERVER_UID
+                    && (!mAllowMediaUid || Binder.getCallingUid() != Process.MEDIA_UID)) {
                 Slog.e(TAG, "Calling UID: " + Binder.getCallingUid() + " doesn't match expected " +
                         " camera service UID!");
                 return;
@@ -1099,6 +1105,9 @@ public class CameraServiceProxy extends SystemService
         if (DEBUG) {
             Slogf.v(TAG, "Notify NFC behavior is %s", (mNotifyNfc ? "active" : "disabled"));
         }
+        mLimitRefreshRate = SystemProperties.getBoolean(LIMIT_REFRESH_RATE_PROP, true);
+        mAllowMediaUid = mContext.getResources().getBoolean(
+                com.android.internal.R.bool.config_allowMediaUidForCameraServiceProxy);
         // Don't keep any extra logging threads if not needed
         mLogWriterService.setKeepAliveTime(1, TimeUnit.SECONDS);
         mLogWriterService.allowCoreThreadTimeOut(true);
@@ -1598,7 +1607,7 @@ public class CameraServiceProxy extends SystemService
                     }
                     // If not already active, notify window manager about this new package using a
                     // camera
-                    if (!alreadyActivePackage) {
+                    if (!alreadyActivePackage && mLimitRefreshRate) {
                         WindowManagerInternal wmi =
                                 LocalServices.getService(WindowManagerInternal.class);
                         float minFps = getMinFps(cameraState);
