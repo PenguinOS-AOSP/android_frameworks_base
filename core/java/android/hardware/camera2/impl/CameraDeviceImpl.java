@@ -16,6 +16,7 @@
 
 package android.hardware.camera2.impl;
 
+import static android.hardware.camera2.CameraAccessException.CAMERA_IN_USE;
 import static com.android.internal.util.function.pooled.PooledLambda.obtainRunnable;
 
 import android.annotation.FlaggedApi;
@@ -27,6 +28,8 @@ import android.compat.annotation.EnabledSince;
 import android.content.Context;
 import android.graphics.ImageFormat;
 import android.hardware.ICameraService;
+import android.app.ActivityThread;
+import android.graphics.ImageFormat;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -72,6 +75,8 @@ import android.os.Parcelable;
 import android.os.RemoteException;
 import android.os.ServiceSpecificException;
 import android.os.SystemClock;
+import android.os.SystemProperties;
+import android.text.TextUtils;
 import android.util.Log;
 import android.util.Range;
 import android.util.Size;
@@ -118,6 +123,7 @@ public class CameraDeviceImpl extends CameraDevice
     };
 
     private static final int REQUEST_ID_NONE = -1;
+    private int customOpMode = 0;
 
     /**
      * Starting {@link Build.VERSION_CODES#VANILLA_ICE_CREAM},
@@ -184,6 +190,8 @@ public class CameraDeviceImpl extends CameraDevice
     private final int mTotalPartialCount;
     private final Context mContext;
 
+    private final boolean mForceMultiResolution;
+
     private static final long NANO_PER_SECOND = 1000000000; //ns
 
     /**
@@ -205,6 +213,7 @@ public class CameraDeviceImpl extends CameraDevice
     private int mNextSessionId = 0;
 
     private final int mAppTargetSdkVersion;
+    private boolean mIsPrivilegedApp = false;
 
     private ExecutorService mOfflineSwitchService;
     private CameraOfflineSessionImpl mOfflineSessionImpl;
@@ -447,6 +456,10 @@ public class CameraDeviceImpl extends CameraDevice
         } else {
             mTotalPartialCount = partialCount;
         }
+        mIsPrivilegedApp = checkPrivilegedAppList();
+
+        mForceMultiResolution = mContext.getResources().getBoolean(
+                com.android.internal.R.bool.config_forceMultiResolution);
     }
 
     /**
@@ -578,6 +591,10 @@ public class CameraDeviceImpl extends CameraDevice
         }
     }
 
+    public void setVendorStreamConfigMode(int fpsrange) {
+        customOpMode = fpsrange;
+    }
+
     @Override
     public String getId() {
         return mCameraId;
@@ -675,6 +692,7 @@ public class CameraDeviceImpl extends CameraDevice
                 }
 
                 InputConfiguration currentInputConfig = mConfiguredInput.getValue();
+                operatingMode = (operatingMode | (customOpMode << 16));
                 int offlineStreamIds[];
                 if (!Flags.configureStreamsBatch()) {
 
@@ -2064,6 +2082,27 @@ public class CameraDeviceImpl extends CameraDevice
         return false;
     }
 
+    private boolean checkPrivilegedAppList() {
+        String packageName = ActivityThread.currentOpPackageName();
+        String packageList = SystemProperties.get("persist.vendor.camera.privapp.list");
+
+        if (packageList.length() > 0) {
+            TextUtils.StringSplitter splitter = new TextUtils.SimpleStringSplitter(',');
+            splitter.setString(packageList);
+            for (String str : splitter) {
+                if (packageName.equals(str)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public boolean isPrivilegedApp() {
+        return mIsPrivilegedApp;
+    }
+
     private boolean checkSurfaceSizesCompatible(List<OutputConfiguration> outputConfigs) {
         for (OutputConfiguration outputConfig : outputConfigs) {
             Size configuredSize = outputConfig.getConfiguredSize();
@@ -2085,7 +2124,7 @@ public class CameraDeviceImpl extends CameraDevice
             return;
         }
         int inputFormat = inputConfig.getFormat();
-        if (inputConfig.isMultiResolution()) {
+        if (inputConfig.isMultiResolution() || mForceMultiResolution) {
             MultiResolutionStreamConfigurationMap configMap = mCharacteristics.get(
                     CameraCharacteristics.SCALER_MULTI_RESOLUTION_STREAM_CONFIGURATION_MAP);
 
@@ -2122,6 +2161,14 @@ public class CameraDeviceImpl extends CameraDevice
                         inputConfig.getWidth() + "x" + inputConfig.getHeight() + " is not valid");
             }
         } else {
+            /*
+             * don't check input format and size,
+             * if the package name is in the white list
+             */
+            if (isPrivilegedApp()) {
+                Log.w(TAG, "ignore input format/size check for white listed app");
+                return;
+            }
             if (!checkInputConfigurationWithStreamConfigurations(inputConfig, /*maxRes*/false) &&
                     !checkInputConfigurationWithStreamConfigurations(inputConfig, /*maxRes*/true)) {
                 throw new IllegalArgumentException("Input config with format " +
