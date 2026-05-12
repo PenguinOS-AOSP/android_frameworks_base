@@ -36,6 +36,7 @@ import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
 import android.annotation.TestApi;
+import android.hardware.Camera;
 import android.app.compat.CompatChanges;
 import android.companion.virtual.VirtualDeviceManager;
 import android.compat.annotation.ChangeId;
@@ -75,6 +76,7 @@ import android.os.ServiceManager;
 import android.os.ServiceSpecificException;
 import android.os.SystemProperties;
 import android.text.TextUtils;
+import android.util.Log;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Log;
@@ -2513,7 +2515,9 @@ public final class CameraManager {
                     Thread.currentThread().getId(), mDeviceStatus.size()));
             try {
                 List<String> cameraIds = new ArrayList<>();
+                boolean exposeAuxCamera = Camera.shouldExposeAuxCamera();
                 for (int i = 0; i < mDeviceStatus.size(); i++) {
+                    if (!exposeAuxCamera && i == 2) break;
                     int status = mDeviceStatus.valueAt(i);
                     DeviceCameraInfo info = mDeviceStatus.keyAt(i);
                     if (status == ICameraServiceListener.STATUS_NOT_PRESENT
@@ -2845,6 +2849,13 @@ public final class CameraManager {
                     throw new IllegalArgumentException("cameraId was null");
                 }
 
+                /* Force to expose only two cameras
+                 * if the package name does not falls in this bucket
+                 */
+                if (!Camera.shouldExposeAuxCamera() && (Integer.parseInt(cameraId) >= 2)) {
+                    throw new IllegalArgumentException("invalid cameraId");
+                }
+
                 ICameraService cameraService = getCameraService();
                 if (cameraService == null) {
                     throw new CameraAccessException(CameraAccessException.CAMERA_DISCONNECTED,
@@ -3115,6 +3126,20 @@ public final class CameraManager {
         }
 
         private void onStatusChangedLocked(int status, DeviceCameraInfo info) {
+            /* Force to ignore the last mono/aux camera status update
+             * if the package name does not falls in this bucket
+             */
+            if (!Camera.shouldExposeAuxCamera()) {
+                try {
+                    if (Integer.parseInt(info.mCameraId) >= 2) {
+                        Log.w(TAG, "[soar.cts] ignore the status update of camera: " + info.mCameraId);
+                        return;
+                    }
+                } catch (NumberFormatException e) {
+                    Log.w(TAG, "[soar.cts] ignore the status change of camera: " + info.mCameraId);
+                }
+            }
+
             if (DEBUG) {
                 Log.v(TAG,
                         String.format("Camera id %s has status changed to 0x%x for device %d",
@@ -3282,6 +3307,17 @@ public final class CameraManager {
                         "Camera id %s has torch status changed to 0x%x for device %d",
                         info.mCameraId, status, info.mDeviceId));
             }
+
+            /* Force to ignore the aux or composite camera torch status update
+             * if the package name does not falls in this bucket
+             */
+            if (!Camera.shouldExposeAuxCamera()) {
+                if (Integer.parseInt(info.mCameraId) >= 2) {
+                    Log.w(TAG, "ignore the torch status update of camera: " + info.mCameraId);
+                    return;
+                }
+            }
+
 
             if (!validTorchStatus(status)) {
                 Log.e(TAG, String.format(
