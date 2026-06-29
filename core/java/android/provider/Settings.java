@@ -14307,7 +14307,12 @@ public final class Settings {
         /**
          * @hide
          */
-        public static final String SPOOF_TRICKYSTORE_PATCH = "spoof_trickystore_patch";        
+        public static final String SPOOF_TRICKYSTORE_PATCH = "spoof_trickystore_patch";
+
+        /**
+         * @hide
+         */
+        public static final String SPOOF_PIF_TARGETS = "spoof_pif_targets";
 
     }
 
