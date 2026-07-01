@@ -99,6 +99,8 @@ import android.util.Dumpable;
 import android.util.EventLog;
 import android.util.IndentingPrintWriter;
 import android.util.Log;
+import com.android.server.AxExtServiceFactory;
+
 import android.util.Pair;
 import android.util.Slog;
 import android.util.TimeUtils;
@@ -1386,6 +1388,7 @@ public final class SystemServer implements Dumpable {
 
         mFirstBoot = mPackageManagerService.isFirstBoot();
         mPackageManager = mSystemContext.getPackageManager();
+        AxExtServiceFactory.injectPackageManagerservice(mPackageManagerService);
         t.traceEnd();
 
         t.traceBegin("DexUseManagerLocal");
@@ -1569,6 +1572,8 @@ public final class SystemServer implements Dumpable {
         mSystemServiceManager.updateOtherServicesStartIndex();
 
         final Context context = mSystemContext;
+        AxExtServiceFactory.init(context);
+
         DynamicSystemService dynamicSystem = null;
         IStorageManager storageManager = null;
         NetworkManagementService networkManagement = null;
@@ -1789,6 +1794,7 @@ public final class SystemServer implements Dumpable {
 
             t.traceBegin("SetWindowManagerService");
             mActivityManagerService.setWindowManager(wm);
+            AxExtServiceFactory.injectWindowManagerService(wm);
             t.traceEnd();
 
             t.traceBegin("WindowManagerServiceOnInitReady");
@@ -3431,6 +3437,8 @@ public final class SystemServer implements Dumpable {
         // initialization.
         mActivityManagerService.systemReady(() -> {
             Slog.i(TAG, "Making services ready");
+            AxExtServiceFactory.systemReady();
+
             t.traceBegin("StartActivityManagerReadyPhase");
             mSystemServiceManager.startBootPhase(t, SystemService.PHASE_ACTIVITY_MANAGER_READY);
             t.traceEnd();
