@@ -9830,6 +9830,8 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
         t.traceEnd();
 
+        AxExtServiceFactory.earlySystemReady();
+
         if (goingCallback != null) goingCallback.run();
 
         t.traceBegin("getCurrentUser"); // should be fast, but these methods acquire locks
