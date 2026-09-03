@@ -55,6 +55,7 @@ import com.android.internal.logging.UiEventLogger;
 import com.android.internal.logging.testing.UiEventLoggerFake;
 import com.android.internal.statusbar.IStatusBarService;
 import com.android.internal.util.LatencyTracker;
+import com.android.keyguard.EmergencyButtonController;
 import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.keyguard.dagger.KeyguardStatusBarViewComponent;
 import com.android.systemui.SysuiTestCase;
@@ -121,11 +122,13 @@ import com.android.systemui.statusbar.notification.ConversationNotificationManag
 import com.android.systemui.statusbar.notification.DynamicPrivacyController;
 import com.android.systemui.statusbar.notification.NotificationWakeUpCoordinator;
 import com.android.systemui.statusbar.notification.NotificationWakeUpCoordinatorLogger;
+import com.android.systemui.statusbar.notification.collection.NotifPipeline;
 import com.android.systemui.statusbar.notification.data.repository.NotificationsKeyguardViewStateRepository;
 import com.android.systemui.statusbar.notification.domain.interactor.ActiveNotificationsInteractor;
 import com.android.systemui.statusbar.notification.domain.interactor.NotificationsKeyguardInteractor;
 import com.android.systemui.statusbar.notification.headsup.HeadsUpManager;
 import com.android.systemui.statusbar.notification.headsup.HeadsUpTouchHelper;
+import com.android.systemui.statusbar.notification.interruption.KeyguardNotificationVisibilityProvider;
 import com.android.systemui.statusbar.notification.row.NotificationGutsManager;
 import com.android.systemui.statusbar.notification.stack.AmbientState;
 import com.android.systemui.statusbar.notification.stack.NotificationListContainer;
@@ -236,6 +239,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     @Mock protected FragmentService mFragmentService;
     @Mock protected FragmentHostManager mFragmentHostManager;
     @Mock protected IStatusBarService mStatusBarService;
+    @Mock protected EmergencyButtonController.Factory mEmergencyButtonControllerFactory;
     @Mock protected NotificationRemoteInputManager mNotificationRemoteInputManager;
     @Mock protected ScreenRecordUxController mScreenRecordUxController;
     @Mock protected LockscreenGestureLogger mLockscreenGestureLogger;
@@ -267,6 +271,8 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     @Mock private CastController mCastController;
     @Mock private SharedNotificationContainerInteractor mSharedNotificationContainerInteractor;
     @Mock protected ActiveNotificationsInteractor mActiveNotificationsInteractor;
+    @Mock protected NotifPipeline mNotifPipeline;
+    @Mock protected KeyguardNotificationVisibilityProvider mKeyguardNotificationVisibilityProvider;
     @Mock private KeyguardClockPositionAlgorithm mKeyguardClockPositionAlgorithm;
     @Mock private NaturalScrollingSettingObserver mNaturalScrollingSettingObserver;
     @Mock private LargeScreenHeaderHelper mLargeScreenHeaderHelper;
@@ -566,6 +572,9 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mActivityStarter,
                 mSharedNotificationContainerInteractor,
                 mActiveNotificationsInteractor,
+                mEmergencyButtonControllerFactory,
+                mNotifPipeline,
+                mKeyguardNotificationVisibilityProvider,
                 mShadeAnimationInteractor,
                 mDeviceEntryFaceAuthInteractor,
                 new ResourcesSplitShadeStateController(),
