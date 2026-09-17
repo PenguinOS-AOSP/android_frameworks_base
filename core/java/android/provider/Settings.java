@@ -14856,6 +14856,11 @@ public final class Settings {
         public static final String PULSE_CUSTOM_COLOR = "pulse_custom_color";
 
         /**
+         * @hide
+         */
+        public static final String PULSE_CAPTURE_MODE = "pulse_capture_mode";
+
+        /**
          * Lockscreen custom clock face
          * @hide
          */
