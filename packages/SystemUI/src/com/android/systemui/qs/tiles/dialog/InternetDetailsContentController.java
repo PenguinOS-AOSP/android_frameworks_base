@@ -14,19 +14,12 @@
  * limitations under the License.
  */
 
-/**
- * Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
- * SPDX-License-Identifier: BSD-3-Clause-Clear
- */
-
 package com.android.systemui.qs.tiles.dialog;
 
 import static android.telephony.SubscriptionManager.PROFILE_CLASS_PROVISIONING;
 
 import static com.android.settingslib.mobile.MobileMappings.getIconKey;
 import static com.android.settingslib.mobile.MobileMappings.mapIconSets;
-import static com.android.settingslib.mobile.MobileMappings.toIconKey;
 import static com.android.settingslib.wifi.WifiUtils.getHotspotIconResource;
 import static com.android.wifitrackerlib.WifiEntry.CONNECTED_STATE_CONNECTED;
 
@@ -39,7 +32,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.UserInfo;
 import android.content.res.Resources;
-import android.database.ContentObserver;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.ColorDrawable;
@@ -51,11 +43,9 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkPolicyManager;
 import android.net.wifi.WifiConfiguration;
-import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.RemoteException;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Settings;
@@ -109,9 +99,6 @@ import com.android.systemui.shade.ShadeDisplayAware;
 import com.android.systemui.shade.domain.interactor.ShadeDialogContextInteractor;
 import com.android.systemui.statusbar.connectivity.AccessPointController;
 import com.android.systemui.statusbar.core.NewStatusBarIcons;
-import com.android.systemui.statusbar.policy.FiveGServiceClient;
-import com.android.systemui.statusbar.policy.FiveGServiceClient.FiveGServiceState;
-import com.android.systemui.statusbar.policy.FiveGServiceClient.IFiveGStateListener;
 import com.android.systemui.statusbar.policy.HotspotController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.LocationController;
@@ -120,16 +107,12 @@ import com.android.systemui.toast.ToastFactory;
 import com.android.systemui.user.data.repository.UserRepository;
 import com.android.systemui.util.CarrierConfigTracker;
 import com.android.systemui.util.kotlin.JavaAdapterKt;
-import com.android.systemui.util.CarrierNameCustomization;
 import com.android.systemui.util.settings.GlobalSettings;
 import com.android.wifitrackerlib.HotspotNetworkEntry;
 import com.android.wifitrackerlib.MergedCarrierEntry;
 import com.android.wifitrackerlib.WifiEntry;
 
 import kotlinx.coroutines.CoroutineScope;
-import com.qti.extphone.ExtTelephonyManager;
-import com.qti.extphone.RadioIconType;
-import com.qti.extphone.ServiceCallback;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -190,9 +173,6 @@ public class InternetDetailsContentController implements AccessPointController.A
     static final int SATELLITE_STARTED = 1;
     static final int SATELLITE_NOT_STARTED = 0;
 
-    private static final String DUAL_DATA_PREFERENCE = "dual_data_preference";
-    private static final Uri DUAL_DATA_USER_PREFERENCE = Settings
-            .Global.getUriFor(DUAL_DATA_PREFERENCE);
     private final FeatureFlags mFeatureFlags;
 
     //Should be accessible only to the main thread.
@@ -241,8 +221,6 @@ public class InternetDetailsContentController implements AccessPointController.A
     private boolean mHasWifiEntries;
     private WifiStateWorker mWifiStateWorker;
     private boolean mHasActiveSubIdOnDds;
-    private int mNonDdsCallState = TelephonyManager.CALL_STATE_IDLE;
-    private int mActiveDataSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
     private boolean mIsMobileDataEnabled = false;
     private UserRepository mUserRepository;
     private boolean mHasMultipleFullUsers = false;
@@ -262,6 +240,7 @@ public class InternetDetailsContentController implements AccessPointController.A
     protected ActivityStarter mActivityStarter;
     @VisibleForTesting
     protected SubscriptionManager.OnSubscriptionsChangedListener mOnSubscriptionsChangedListener;
+    @VisibleForTesting
     protected WifiUtils.InternetIconInjector mWifiIconInjector;
     @VisibleForTesting
     protected boolean mCanConfigWifi;
@@ -273,44 +252,6 @@ public class InternetDetailsContentController implements AccessPointController.A
     protected ConnectedWifiInternetMonitor mConnectedWifiInternetMonitor;
     @VisibleForTesting
     protected boolean mCarrierNetworkChangeMode;
-    private CarrierNameCustomization mCarrierNameCustomization;
-
-    private boolean mIsSmartDdsSwitchFeatureAvailable;
-    private boolean mIsExtTelServiceConnected = false;
-    private ExtTelephonyManager mExtTelephonyManager;
-    private boolean mHasDualDataCapability = false;
-    private ContentObserver mDualDataContentObserver;
-    private int mNddsSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
-    private boolean mIsNddsDataEnabled = false;
-    private FiveGServiceClient mFiveGServiceClient;
-    private final Map<Integer, FiveGStateMonitor> mSubIdFiveGStateMonitorMap = new HashMap<>();
-
-    private ServiceCallback mExtTelServiceCallback = new ServiceCallback() {
-        @Override
-        public void onConnected() {
-            Log.d(TAG, "ExtTelephony service connected");
-            mIsExtTelServiceConnected = true;
-            try {
-                mIsSmartDdsSwitchFeatureAvailable =
-                        mExtTelephonyManager.isSmartDdsSwitchFeatureAvailable();
-                mHasDualDataCapability = mExtTelephonyManager.getDualDataCapability();
-                Log.d(TAG, "isSmartDdsSwitchFeatureAvailable: " +
-                        mIsSmartDdsSwitchFeatureAvailable +
-                        " mHasDualDataCapability: " + mHasDualDataCapability);
-            } catch (RemoteException ex) {
-                Log.e(TAG, "isSmartDdsSwitchFeatureAvailable exception " + ex);
-            }
-            handleDualDataUserPerferenceListener();
-        }
-
-        @Override
-        public void onDisconnected() {
-            Log.d(TAG, "ExtTelephony service disconnected");
-            mIsExtTelServiceConnected = false;
-            mHasDualDataCapability = false;
-            handleDualDataUserPerferenceListener();
-        }
-    };
 
     int mCurrentSatelliteState = SATELLITE_NOT_STARTED;
 
@@ -390,14 +331,12 @@ public class InternetDetailsContentController implements AccessPointController.A
             @ShadeDisplayAware WindowManager windowManager, ToastFactory toastFactory,
             @Background Handler workerHandler, CarrierConfigTracker carrierConfigTracker,
             LocationController locationController,
-            DialogTransitionAnimator dialogTransitionAnimator,
-            WifiStateWorker wifiStateWorker,
+            DialogTransitionAnimator dialogTransitionAnimator, WifiStateWorker wifiStateWorker,
             HotspotController hotspotController,
             FeatureFlags featureFlags,
             ShadeDialogContextInteractor shadeDialogContextInteractor,
-            UserRepository userRepository,
-            CarrierNameCustomization carrierNameCustomization
-    ) {
+            UserRepository userRepository
+        ) {
         if (DEBUG) {
             Log.d(TAG, "Init InternetDetailsContentController");
         }
@@ -434,11 +373,8 @@ public class InternetDetailsContentController implements AccessPointController.A
         mHotspotController = hotspotController;
         mPolicyManager = NetworkPolicyManager.from(context);
         mFeatureFlags = featureFlags;
-        mCarrierNameCustomization = carrierNameCustomization;
         mShadeDialogContextInteractor = shadeDialogContextInteractor;
         mUserRepository = userRepository;
-        mExtTelephonyManager = ExtTelephonyManager.getInstance(context);
-        mFiveGServiceClient = FiveGServiceClient.getInstance(context);
     }
 
     void onStart(@NonNull InternetDialogCallback callback,
@@ -459,7 +395,6 @@ public class InternetDetailsContentController implements AccessPointController.A
         mSubscriptionManager.addOnSubscriptionsChangedListener(mExecutor,
                 mOnSubscriptionsChangedListener);
         mDefaultDataSubId = getDefaultDataSubscriptionId();
-        mActiveDataSubId = mSubscriptionManager.getActiveDataSubscriptionId();
         if (DEBUG) {
             Log.d(TAG, "Init, SubId: " + mDefaultDataSubId);
         }
@@ -475,6 +410,7 @@ public class InternetDetailsContentController implements AccessPointController.A
         }
         mCanConfigWifi = canConfigWifi;
         scanWifiAccessPoints();
+
         if (mSatelliteManager != null) {
             try {
                 mSatelliteManager.registerForModemStateChanged(mExecutor,
@@ -492,13 +428,6 @@ public class InternetDetailsContentController implements AccessPointController.A
                     scanWifiAccessPoints();
                 }
         );
-        if (!mIsExtTelServiceConnected) {
-            mExtTelephonyManager.connectService(mExtTelServiceCallback);
-        } else {
-            notifyDualDataEnabledStateChanged();
-        }
-        mIsNddsDataEnabled = mTelephonyManager.createForSubscriptionId(mNddsSubId).isDataEnabled();
-        registerFiveGStateMonitor();
     }
 
     void onStop() {
@@ -533,7 +462,6 @@ public class InternetDetailsContentController implements AccessPointController.A
                 Log.w(TAG, "Unable to unregister callback for modem state changes : " + e);
             }
         }
-        unregisterFiveGStateMonitor();
     }
 
     /**
@@ -652,7 +580,7 @@ public class InternetDetailsContentController implements AccessPointController.A
             return mContext.getText(SUBTITLE_TEXT_ALL_CARRIER_NETWORK_UNAVAILABLE);
         }
 
-        if (mCanConfigWifi && !isMobileDataEnabled(mDefaultDataSubId)) {
+        if (mCanConfigWifi && !mIsMobileDataEnabled) {
             if (DEBUG) {
                 Log.d(TAG, "Mobile data off");
             }
@@ -742,7 +670,6 @@ public class InternetDetailsContentController implements AccessPointController.A
         final SignalStrength strength = tm.getSignalStrength();
         int level = (strength == null) ? 0 : strength.getLevel();
         int numLevels = SignalStrength.NUM_SIGNAL_STRENGTH_BINS;
-        boolean hideNoInternetState = mConfig.hideNoInternetState;
         if (isCarrierNetworkActive) {
             level = getCarrierNetworkLevel();
             numLevels = WifiEntry.WIFI_LEVEL_MAX + 1;
@@ -754,9 +681,8 @@ public class InternetDetailsContentController implements AccessPointController.A
             level += 1;
             numLevels += 1;
         }
-        Log.i(TAG, "hideNoInternetState:" + hideNoInternetState);
         return getSignalStrengthIcon(subId, mContext, level, numLevels, NO_CELL_DATA_TYPE_ICON,
-                !hideNoInternetState && !isMobileDataEnabledWithNddsOverrideConsidered(subId));
+                !mIsMobileDataEnabled);
     }
 
     Drawable getSignalStrengthIcon(int subId, Context context, int level, int numLevels,
@@ -899,7 +825,6 @@ public class InternetDetailsContentController implements AccessPointController.A
                 registerInternetTelephonyCallback(secondaryTm, subId);
                 mSubIdTelephonyManagerMap.put(subId, secondaryTm);
             }
-            Log.d(TAG, "getActiveAutoSwitchNonDdsSubId: " + subId);
             return subId;
         }
         return SubscriptionManager.INVALID_SUBSCRIPTION_ID;
@@ -940,26 +865,11 @@ public class InternetDetailsContentController implements AccessPointController.A
     }
 
     CharSequence getMobileNetworkTitle(int subId) {
-        if (mCarrierNameCustomization.isRoamingCustomizationEnabled()
-                && mCarrierNameCustomization.isRoaming(subId)) {
-            return mCarrierNameCustomization.getRoamingCarrierName(subId);
-        } else {
-            return getUniqueSubscriptionDisplayName(subId, mContext);
-        }
+        return getUniqueSubscriptionDisplayName(subId, mContext);
     }
 
     String getMobileNetworkSummary(int subId) {
-        String networkTypeDescription = "";
-        final FiveGServiceState fiveGState = getFiveGServiceState(subId);
-        final int radioIconType = fiveGState.getRadioIconType();
-        if ((mCarrierNameCustomization.show5GAIcon() && radioIconType == RadioIconType.TYPE_5G_UWB)
-                || fiveGState.getRadioIconType() == RadioIconType.TYPE_LTE_NB_IOT) {
-            networkTypeDescription = mCarrierNameCustomization.getNetworkTypeDescription(subId);
-        }
-
-        if (TextUtils.isEmpty(networkTypeDescription)) {
-            networkTypeDescription = getNetworkTypeDescription(mContext, mConfig, subId);
-        }
+        String networkTypeDescription = getNetworkTypeDescription(mContext, mConfig, subId);
         if (DEBUG) {
             Log.d(TAG,
                     "getMobileNetworkSummary(), NetworkTypeDescription:" + networkTypeDescription);
@@ -978,19 +888,7 @@ public class InternetDetailsContentController implements AccessPointController.A
             Log.d(TAG, "getNetworkTypeDescription(), subId:" + subId
                     + ",telephonyDisplayInfo:" + telephonyDisplayInfo);
         }
-        String iconKey = null;
-        if (isNsa(telephonyDisplayInfo)) {
-            final FiveGServiceState fiveGState = getFiveGServiceState(subId);
-            // RadioIconType includes NR and NB-IoT, so NB-IoT needs to be filtered out.
-            if (!fiveGState.isRadioIconTypeValid()
-                    || fiveGState.getRadioIconType() == RadioIconType.TYPE_LTE_NB_IOT) {
-                iconKey = toIconKey(telephonyDisplayInfo.getNetworkType());
-            } else {
-                iconKey = getIconKey(telephonyDisplayInfo);
-            }
-        } else {
-            iconKey = getIconKey(telephonyDisplayInfo);
-        }
+        String iconKey = getIconKey(telephonyDisplayInfo);
 
         if (mapIconSets(config) == null || mapIconSets(config).get(iconKey) == null) {
             if (DEBUG) {
@@ -1013,15 +911,6 @@ public class InternetDetailsContentController implements AccessPointController.A
                 resId) : "";
     }
 
-    private boolean isNsa(TelephonyDisplayInfo telephonyDisplayInfo) {
-        if (telephonyDisplayInfo != null) {
-            final int networkType = telephonyDisplayInfo.getOverrideNetworkType();
-            return networkType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA_MMWAVE
-                    || networkType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA;
-        }
-        return false;
-    }
-
     private String getMobileSummary(Context context, String networkTypeDescription, int subId) {
         // SIM Display Logic for Dual SIM Scenarios
         // There are three case of two SIMs:
@@ -1034,13 +923,10 @@ public class InternetDetailsContentController implements AccessPointController.A
         // 3. CBRS SIMs set (Non-DDS CBRS SIM is active data):
         //    Displays the Active Data SIM only
 
-        if (!isMobileDataEnabled(subId)) {
+        if (!isMobileDataEnabled()) {
             return context.getString(R.string.mobile_data_off_summary);
         }
         String summary = networkTypeDescription;
-        
-        boolean isSmartDdsEnabled = Settings.Global.getInt(context.getContentResolver(),
-                Settings.Global.SMART_DDS_SWITCH, 0) == 1;
         int activeDataSubId = getActiveDataSubId();
         int activeAutoSwitchNonDdsSubId = getActiveAutoSwitchNonDdsSubId();
         boolean isDds = subId == mDefaultDataSubId;
@@ -1055,15 +941,13 @@ public class InternetDetailsContentController implements AccessPointController.A
 
         // Set network description for the carrier network when connecting to the carrier network
         // under the airplane mode ON.
-        if ((!isDualDataEnabled() || isDataStateInService(subId))
-                && (activeNetworkIsCellular() || isCarrierNetworkActive())) {
+        if (activeNetworkIsCellular() || isCarrierNetworkActive()) {
             summary = context.getString(
                     com.android.settingslib.R.string.preference_summary_default_combination,
                     context.getString(
-                            // if nonDds is active, explains Dds status as poor connection
-                            isForVisibleDds || isSmartDdsEnabled
-                                    ? (isOnNonDds && !isSmartDdsEnabled
-                                    ? R.string.mobile_data_poor_connection
+                            isForVisibleDds
+                                    // if nonDds is active, explains Dds status as poor connection
+                                    ? (isOnNonDds ? R.string.mobile_data_poor_connection
                                     : R.string.mobile_data_connection_active)
                                     : R.string.mobile_data_temp_connection_active),
                     networkTypeDescription);
@@ -1158,7 +1042,7 @@ public class InternetDetailsContentController implements AccessPointController.A
     void connectCarrierNetwork() {
         String errorLogPrefix = "Fail to connect carrier network : ";
 
-        if (!isMobileDataEnabled(mDefaultDataSubId)) {
+        if (!isMobileDataEnabled()) {
             if (DEBUG) {
                 Log.d(TAG, errorLogPrefix + "settings OFF");
             }
@@ -1284,42 +1168,10 @@ public class InternetDetailsContentController implements AccessPointController.A
     }
 
     /**
-     * Return {@code true} if there is an ongoing call on the non-DDS
-     */
-    boolean isNonDdsCallStateIdle() {
-        return mNonDdsCallState == TelephonyManager.CALL_STATE_IDLE;
-    }
-
-    /**
-     * Return {@code true} if temporary DDS switch happened
-     */
-    boolean isTempDdsHappened() {
-        return mDefaultDataSubId != mActiveDataSubId;
-    }
-
-    /**
-     * Return {@code true} if mobile data is enabled
-     */
-    boolean isMobileDataEnabled(int subId) {
-        if (mTelephonyManager == null) {
-            return false;
-        }
-        return mTelephonyManager.createForSubscriptionId(subId).isDataEnabled();
-    }
-
-        /**
      * Return {@code true} if mobile data is enabled
      */
     boolean isMobileDataEnabled() {
         return mIsMobileDataEnabled;
-    }
-
-    boolean isMobileDataEnabledWithNddsOverrideConsidered(int subId) {
-        if (subId != getDefaultDataSubscriptionId()) {
-            Log.i(TAG, "isMobileDataEnabled：mIsNddsDataEnabled = " + mIsNddsDataEnabled);
-            return mIsNddsDataEnabled;
-        }
-        return isMobileDataEnabled(subId);
     }
 
     /**
@@ -1342,8 +1194,8 @@ public class InternetDetailsContentController implements AccessPointController.A
             return;
         }
 
-        mTelephonyManager.createForSubscriptionId(subId).setDataEnabledForReason(
-                TelephonyManager.DATA_ENABLED_REASON_USER, enabled);
+        mTelephonyManager.setDataEnabledForReason(TelephonyManager.DATA_ENABLED_REASON_USER,
+                enabled);
         if (disableOtherSubscriptions) {
             final List<SubscriptionInfo> subInfoList = getActiveSubscriptionInfoList();
             if (subInfoList != null) {
@@ -1429,13 +1281,6 @@ public class InternetDetailsContentController implements AccessPointController.A
         final ServiceState serviceState = mSubIdServiceState.getOrDefault(subId,
                 new ServiceState());
         return serviceState != null && serviceState.getState() == serviceState.STATE_IN_SERVICE;
-    }
-
-    /**
-     * Return {@code true} if Smart DDS Switch feature is available
-     */
-    boolean isSmartDdsSwitchFeatureAvailable() {
-        return mIsSmartDdsSwitchFeatureAvailable;
     }
 
     public boolean isDeviceLocked() {
@@ -1600,114 +1445,13 @@ public class InternetDetailsContentController implements AccessPointController.A
     public void onSettingsActivityTriggered(Intent settingsIntent) {
     }
 
-    private void registerTelephonyCallbackOnNddsSub(int previousNddsSubId) {
-        if (SubscriptionManager.isUsableSubscriptionId(mNddsSubId)) {
-            boolean needUpdateCallback = false;
-            if (previousNddsSubId != mNddsSubId) {
-                if (mSubIdTelephonyCallbackMap.containsKey(previousNddsSubId)) {
-                    unRegisterCallback(previousNddsSubId);
-                    Log.d(TAG, "unregister for old  Ndds : " + previousNddsSubId);
-                }
-                needUpdateCallback = true;
-            } else if (needChangeCallback()){
-                needUpdateCallback = true;
-            }
-
-            if (needUpdateCallback) {
-                if (mSubIdTelephonyCallbackMap.containsKey(mNddsSubId)) {
-                    unRegisterCallback(mNddsSubId);
-                    Log.d(TAG, "unregister old callback for new Ndds : " + mNddsSubId);
-                }
-                TelephonyCallback telephonyCallback = createNddsSubTelephonyCallback(mNddsSubId);
-                TelephonyManager nDdsSubTm = mTelephonyManager.createForSubscriptionId(mNddsSubId);
-                nDdsSubTm.registerTelephonyCallback(mExecutor, telephonyCallback);
-                mSubIdTelephonyCallbackMap.put(mNddsSubId, telephonyCallback);
-                mSubIdTelephonyManagerMap.put(mNddsSubId, nDdsSubTm);
-                Log.d(TAG, "register for nDDS: " + mNddsSubId);
-            }
-        } else {
-            // Prune stale SUBs
-            List<Integer> staleSubs = mSubIdTelephonyManagerMap.keySet()
-                    .stream().filter(sub -> sub != mDefaultDataSubId).collect(Collectors.toList());
-            for (Integer sub : staleSubs) {
-                Log.d(TAG, "registerTelephonyCallOnNddsSub pruning on SUB: " + sub);
-                TelephonyCallback oldTelephonyCallback = mSubIdTelephonyCallbackMap.get(sub);
-                if (oldTelephonyCallback != null) {
-                    mSubIdTelephonyManagerMap.get(sub)
-                            .unregisterTelephonyCallback(oldTelephonyCallback);
-                }
-                mSubIdTelephonyManagerMap.remove(sub);
-                mSubIdTelephonyCallbackMap.remove(sub);
-                mSubIdTelephonyDisplayInfoMap.remove(sub);
-            }
-        }
-    }
-
-    private TelephonyCallback createNddsSubTelephonyCallback(int subId) {
-        return isDualDataEnabled() ? new NonDdsInternetTelephonyCallback(subId)
-                : new NonDdsCallStateCallback();
-    }
-
-    private class NonDdsCallStateCallback extends TelephonyCallback implements
-            TelephonyCallback.CallStateListener,
-            TelephonyCallback.DataEnabledListener {
-
-        @Override
-        public void onCallStateChanged(int callState) {
-            Log.d(TAG, "onCallStateChanged: " + callState);
-            mNonDdsCallState = callState;
-            if (mCallback != null) {
-                mCallback.onNonDdsCallStateChanged(callState);
-            }
-        }
-
-        @Override
-        public void onDataEnabledChanged(boolean enabled,
-                @TelephonyManager.DataEnabledChangedReason int reason) {
-            mIsNddsDataEnabled = enabled;
-            if (mCallback != null) {
-                mCallback.onDataEnabledChanged();
-            }
-            Log.d(TAG, "mIsNddsDataEnabled: " + mIsNddsDataEnabled);
-       }
-    }
-
-    private class NonDdsInternetTelephonyCallback extends InternetTelephonyCallback
-            implements TelephonyCallback.CallStateListener,
-            TelephonyCallback.DataEnabledListener {
-        private NonDdsInternetTelephonyCallback(int subId) {
-            super(subId);
-        }
-
-        @Override
-        public void onCallStateChanged(int callState) {
-            Log.d(TAG, "onCallStateChanged: " + callState);
-            mNonDdsCallState = callState;
-            if (mCallback != null) {
-                mCallback.onNonDdsCallStateChanged(callState);
-            }
-        }
-
-        @Override
-        public void onDataEnabledChanged(boolean enabled,
-                @TelephonyManager.DataEnabledChangedReason int reason) {
-            mIsNddsDataEnabled = enabled;
-            if (mCallback != null) {
-                mCallback.onDataEnabledChanged();
-            }
-            Log.d(TAG, "mIsNddsDataEnabled: " + mIsNddsDataEnabled);
-       }
-    }
-
     @Override
     public void onWifiScan(boolean isScan) {
-        if (mCallback != null) {
-            if (!isWifiEnabled() || isDeviceLocked()) {
-                mCallback.onWifiScan(false);
-                return;
-            }
-            mCallback.onWifiScan(isScan);
+        if (!isWifiEnabled() || isDeviceLocked()) {
+            mCallback.onWifiScan(false);
+            return;
         }
+        mCallback.onWifiScan(isScan);
     }
 
     private class InternetTelephonyCallback extends TelephonyCallback implements
@@ -1715,8 +1459,7 @@ public class InternetDetailsContentController implements AccessPointController.A
             TelephonyCallback.DisplayInfoListener, TelephonyCallback.ServiceStateListener,
             TelephonyCallback.SignalStrengthsListener,
             TelephonyCallback.UserMobileDataStateListener,
-            TelephonyCallback.CarrierNetworkListener,
-            TelephonyCallback.ActiveDataSubscriptionIdListener {
+            TelephonyCallback.CarrierNetworkListener {
 
         private final int mSubId;
 
@@ -1770,20 +1513,9 @@ public class InternetDetailsContentController implements AccessPointController.A
         }
 
         @Override
-        public void onActiveDataSubscriptionIdChanged(int subId) {
-            mActiveDataSubId = subId;
-            if (mCallback != null) {
-                mCallback.onTempDdsSwitchHappened();
-            }
-        }
-
-        @Override
         public void onDataEnabledChanged(boolean b, int i) {
             if (mSubId == mDefaultDataSubId) {
                 mIsMobileDataEnabled = b;
-            }
-            if (mCallback != null) {
-                mCallback.onDataEnabledChanged();
             }
         }
     }
@@ -1796,18 +1528,6 @@ public class InternetDetailsContentController implements AccessPointController.A
 
         @Override
         public void onSubscriptionsChanged() {
-            List<SubscriptionInfo> subInfos = mSubscriptionManager.getActiveSubscriptionInfoList();
-            int numberOfActiveSubscriptions = subInfos.size();
-            /*
-             * When there is only one subscription, there is no nDDS sub, so call state of nDDS is
-             * idle by default. Ensure that call state of nDDS is correctly updated when number of
-             * subscriptions change at runtime.
-             */
-            if (numberOfActiveSubscriptions == 1){
-                Log.d(TAG, "Resetting call state of nDDS");
-                mNonDdsCallState = TelephonyManager.CALL_STATE_IDLE;
-            }
-
             refreshHasActiveSubIdOnDds();
             updateListener();
         }
@@ -1914,16 +1634,10 @@ public class InternetDetailsContentController implements AccessPointController.A
     };
 
     private void updateListener() {
-        updateFiveGStateMonitor();
         int defaultDataSubId = getDefaultDataSubscriptionId();
         if (mDefaultDataSubId == getDefaultDataSubscriptionId()) {
             if (DEBUG) {
                 Log.d(TAG, "DDS: no change");
-            }
-            int lastNddsSubId = mNddsSubId;
-            updateNddsSubId(defaultDataSubId);
-            if (lastNddsSubId != mNddsSubId && mCallback != null) {
-                mCallback.onSubscriptionsChanged(defaultDataSubId);
             }
             return;
         }
@@ -1943,73 +1657,13 @@ public class InternetDetailsContentController implements AccessPointController.A
             mSubIdTelephonyDisplayInfoMap.remove(mDefaultDataSubId);
             mSubIdTelephonyManagerMap.remove(mDefaultDataSubId);
 
-            updateNddsSubId(defaultDataSubId);
             // create for new defaultDataSubId
             mTelephonyManager = mTelephonyManager.createForSubscriptionId(defaultDataSubId);
             mSubIdTelephonyManagerMap.put(defaultDataSubId, mTelephonyManager);
             registerInternetTelephonyCallback(mTelephonyManager, defaultDataSubId);
-            if (mCallback != null) {
-                mCallback.onSubscriptionsChanged(defaultDataSubId);
-            }
+            mCallback.onSubscriptionsChanged(defaultDataSubId);
         }
         mDefaultDataSubId = defaultDataSubId;
-    }
-
-    public int getNddsSubId() {
-        return mNddsSubId;
-    }
-
-    private void handleDualDataUserPerferenceListener() {
-        if (mHasDualDataCapability) {
-            if (mDualDataContentObserver == null) {
-                mDualDataContentObserver = new ContentObserver(mHandler) {
-                    @Override
-                    public void onChange(boolean selfChange, Uri uri) {
-                        if (DUAL_DATA_USER_PREFERENCE.equals(uri)) {
-                            notifyDualDataEnabledStateChanged();
-                        }
-                    }
-                };
-            }
-            mContext.getContentResolver().registerContentObserver(DUAL_DATA_USER_PREFERENCE,
-                    false, mDualDataContentObserver);
-        } else {
-            if (mDualDataContentObserver != null) {
-                mContext.getContentResolver().unregisterContentObserver(mDualDataContentObserver);
-                mDualDataContentObserver = null;
-            }
-        }
-        notifyDualDataEnabledStateChanged();
-    }
-
-    private void notifyDualDataEnabledStateChanged() {
-        updateNddsSubId(mDefaultDataSubId);
-        final boolean isDualDataEnabled = isDualDataEnabled();
-        Log.d(TAG, "Ndds sub ID: " + mNddsSubId + " isDualDataEnabled: " + isDualDataEnabled);
-        if (mCallback != null) {
-            mCallback.onDualDataEnabledStateChanged();
-        }
-    }
-
-    private void updateNddsSubId(int defaultDataSubId) {
-        // update mNddsSubId
-        int previousNddsSubId = mNddsSubId;
-        mNddsSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
-        List<SubscriptionInfo> subInfos =
-                mSubscriptionManager.getActiveSubscriptionInfoList();
-        if (subInfos != null) {
-            for (SubscriptionInfo subInfo : subInfos) {
-                if (subInfo.getSubscriptionId() != defaultDataSubId) {
-                    mNddsSubId = subInfo.getSubscriptionId();
-                }
-            }
-        }
-        registerTelephonyCallbackOnNddsSub(previousNddsSubId);
-    }
-
-    public boolean isDualDataEnabled() {
-        return mHasDualDataCapability && Settings.Global.getInt(mContext.getContentResolver(),
-                DUAL_DATA_PREFERENCE, 0) == 1;
     }
 
     boolean mayLaunchShareWifiSettings(WifiEntry wifiEntry, View view) {
@@ -2019,58 +1673,6 @@ public class InternetDetailsContentController implements AccessPointController.A
         }
         startActivity(intent, view);
         return true;
-    }
-
-    private void registerFiveGStateMonitor() {
-        List<SubscriptionInfo> subInfos =
-                mSubscriptionManager.getActiveSubscriptionInfoList();
-        if (subInfos != null) {
-            for (SubscriptionInfo subInfo : subInfos) {
-                final FiveGStateMonitor monitor =
-                        new FiveGStateMonitor(mFiveGServiceClient, subInfo);
-                monitor.initiate();
-                mSubIdFiveGStateMonitorMap.put(subInfo.getSubscriptionId(), monitor);
-            }
-        }
-    }
-
-    private void unregisterFiveGStateMonitor() {
-        mSubIdFiveGStateMonitorMap.forEach((k, v) -> {
-            v.deInitiate();
-        });
-        mSubIdFiveGStateMonitorMap.clear();
-    }
-
-    private void updateFiveGStateMonitor() {
-        List<SubscriptionInfo> subInfos =
-                mSubscriptionManager.getActiveSubscriptionInfoList();
-        if (subInfos != null) {
-            Map<Integer, FiveGStateMonitor> availableFiveGStateMonitors = new HashMap<>();
-            for (SubscriptionInfo subInfo : subInfos) {
-                if (mSubIdFiveGStateMonitorMap.containsKey(subInfo.getSubscriptionId())) {
-                    availableFiveGStateMonitors.put(subInfo.getSubscriptionId(),
-                            mSubIdFiveGStateMonitorMap.get(subInfo.getSubscriptionId()));
-                    mSubIdFiveGStateMonitorMap.remove(subInfo.getSubscriptionId());
-                } else {
-                    final FiveGStateMonitor monitor =
-                            new FiveGStateMonitor(mFiveGServiceClient, subInfo);
-                    monitor.initiate();
-                    availableFiveGStateMonitors.put(subInfo.getSubscriptionId(), monitor);
-                }
-            }
-            unregisterFiveGStateMonitor(); // clear all invalid monitors
-            mSubIdFiveGStateMonitorMap.putAll(availableFiveGStateMonitors);
-            availableFiveGStateMonitors.clear();
-        } else {
-            unregisterFiveGStateMonitor();
-        }
-    }
-
-    private FiveGServiceState getFiveGServiceState(int subId) {
-        if (mSubIdFiveGStateMonitorMap.containsKey(subId)) {
-            return mSubIdFiveGStateMonitorMap.get(subId).getFiveGServiceState();
-        }
-        return new FiveGServiceState();
     }
 
     interface InternetDialogCallback {
@@ -2102,64 +1704,11 @@ public class InternetDetailsContentController implements AccessPointController.A
         void onAccessPointsChanged(@Nullable List<WifiEntry> wifiEntries,
                 @Nullable WifiEntry connectedEntry, boolean hasMoreWifiEntries);
 
-        void onNonDdsCallStateChanged(int callState);
-
-        void onTempDdsSwitchHappened();
-
-        void onDualDataEnabledStateChanged();
-
         void onWifiScan(boolean isScan);
 
         void onHotspotChanged();
 
         void onSatelliteModemStateChanged(int state);
-
-        void onFiveGStateOverride();
-
-        default void onDataEnabledChanged() {}
-    }
-
-    private class FiveGStateMonitor implements IFiveGStateListener {
-
-        private final FiveGServiceClient mClient;
-        private final SubscriptionInfo mSubscriptionInfo;
-        private FiveGServiceState mState;
-
-        public FiveGStateMonitor(FiveGServiceClient client, SubscriptionInfo subscriptionInfo) {
-            mClient = client;
-            mSubscriptionInfo = subscriptionInfo;
-        }
-
-        public void initiate() {
-            if (mClient != null) {
-                mClient.registerListener(mSubscriptionInfo.getSimSlotIndex(), this);
-            }
-        }
-
-        public void deInitiate() {
-            if (mClient != null) {
-                mClient.unregisterListener(mSubscriptionInfo.getSimSlotIndex(), this);
-            }
-        }
-
-        public FiveGServiceState getFiveGServiceState() {
-            if (mState != null) {
-                return mState;
-            }
-            return new FiveGServiceState();
-        }
-
-        @Override
-        public void onStateChanged(FiveGServiceState state) {
-            mState = state;
-            Log.d(TAG, "Five G state update on SUB " + mSubscriptionInfo.getSubscriptionId()
-                    + " by " + mState);
-            if (mCallback != null) {
-                mCallback.onFiveGStateOverride();
-            }
-        }
-
-
     }
 
     void makeOverlayToast(int stringId) {
@@ -2262,24 +1811,5 @@ public class InternetDetailsContentController implements AccessPointController.A
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         WifiDppIntentHelper.setConfiguratorIntentExtra(intent, mWifiManager, wifiConfiguration);
         return intent;
-    }
-
-    private void unRegisterCallback (int subId) {
-        TelephonyCallback callback = mSubIdTelephonyCallbackMap.get(subId);
-        TelephonyManager telephonyManager = mSubIdTelephonyManagerMap.get(subId);
-        if (callback != null && telephonyManager != null) {
-            telephonyManager.unregisterTelephonyCallback(callback);
-
-        }
-        mSubIdTelephonyCallbackMap.remove(subId);
-    }
-
-    private boolean needChangeCallback() {
-        TelephonyCallback oldCallback = mSubIdTelephonyCallbackMap.get(mNddsSubId);
-        if (oldCallback != null) {
-            return oldCallback.getClass() != (isDualDataEnabled() ?
-                    NonDdsInternetTelephonyCallback.class : NonDdsCallStateCallback.class);
-        }
-        return true;
     }
 }

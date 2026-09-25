@@ -34,9 +34,6 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.res.Resources;
 import android.media.AudioManager;
-// QTI_BEGIN: 2020-04-22: WLAN: wifi: refactor Wi-Fi generation UI enhancements
-import android.net.wifi.ScanResult;
-// QTI_END: 2020-04-22: WLAN: wifi: refactor Wi-Fi generation UI enhancements
 import android.net.wifi.WifiManager;
 import android.nfc.NfcAdapter;
 import android.net.ConnectivityManager;
@@ -84,7 +81,6 @@ import com.android.systemui.statusbar.policy.DataSaverController;
 import com.android.systemui.statusbar.policy.DataSaverController.Listener;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController.DeviceProvisionedListener;
-import com.android.systemui.statusbar.policy.FiveGServiceClient;
 import com.android.systemui.statusbar.policy.HotspotController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.LocationController;
@@ -99,7 +95,6 @@ import com.android.systemui.statusbar.policy.domain.model.ZenModeInfo;
 import com.android.systemui.util.RingerModeTracker;
 import com.android.systemui.util.kotlin.JavaAdapter;
 import com.android.systemui.util.time.DateFormatUtil;
-import com.qti.extphone.AuxiliaryRadioIconInfo;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -188,7 +183,6 @@ public class PhoneStatusBarPolicy
     private boolean mCurrentUserSetup;
 
     private boolean mProfileIconVisible = false;
-    private final String mSlotTurboDsda;
     private boolean mFirewallVisible = false;
 
     private int mLastResumedActivityUid = -1;
@@ -196,11 +190,8 @@ public class PhoneStatusBarPolicy
     private BluetoothController mBluetooth;
     private AlarmManager.AlarmClockInfo mNextAlarm;
 
-    private final FiveGServiceClient mFiveGServiceClient;
-
     private NfcAdapter mAdapter;
     private final Context mContext;
-
     @Inject
     public PhoneStatusBarPolicy(Context context, StatusBarIconController iconController,
             CommandQueue commandQueue, BroadcastDispatcher broadcastDispatcher,
@@ -223,7 +214,7 @@ public class PhoneStatusBarPolicy
             PrivacyLogger privacyLogger,
             ConnectedDisplayInteractor connectedDisplayInteractor,
             ZenModeInteractor zenModeInteractor,
-            JavaAdapter javaAdapter, FiveGServiceClient fiveGServiceClient
+            JavaAdapter javaAdapter
     ) {
         mContext = context;
         mIconController = iconController;
@@ -255,8 +246,6 @@ public class PhoneStatusBarPolicy
         mPrivacyLogger = privacyLogger;
         mZenModeInteractor = zenModeInteractor;
         mJavaAdapter = javaAdapter;
-        mFiveGServiceClient = fiveGServiceClient;
-        mSlotTurboDsda = resources.getString(R.string.status_bar_turbo_dsda);
         mConnectivityManager = context.getSystemService(ConnectivityManager.class);
         mNetworkPolicyManager = context.getSystemService(NetworkPolicyManager.class);
 
@@ -397,9 +386,6 @@ public class PhoneStatusBarPolicy
         mIconController.setIcon(mSlotScreenRecord, R.drawable.stat_sys_screen_record, null);
         mIconController.setIconVisibility(mSlotScreenRecord, false);
 
-        mIconController.setIcon(mSlotTurboDsda, R.drawable.ic_turbo_dsda, null);
-        mIconController.setIconVisibility(mSlotTurboDsda, false);
-        
         mIconController.setIcon(mSlotNfc, R.drawable.stat_sys_nfc,
                 mResources.getString(R.string.accessibility_status_bar_nfc));
 
@@ -409,7 +395,6 @@ public class PhoneStatusBarPolicy
         // firewall
         mIconController.setIcon(mSlotFirewall, R.drawable.stat_sys_firewall, null);
         mIconController.setIconVisibility(mSlotFirewall, mFirewallVisible);
-
         mRotationLockController.addCallback(this);
         mBluetooth.addCallback(this);
         mProvisionedController.addCallback(this);
@@ -428,10 +413,6 @@ public class PhoneStatusBarPolicy
         mLocationController.addCallback(this);
         mJavaAdapter.alwaysCollectFlow(mConnectedDisplayInteractor.getConnectedDisplayState(),
                 this::onConnectedDisplayAvailabilityChanged);
-        if (mFiveGServiceClient != null) {
-            mFiveGServiceClient.registerAuxiliaryListener(mAuxiliaryListener);
-        }
-
 
         mCommandQueue.addCallback(this);
 
@@ -757,13 +738,6 @@ public class PhoneStatusBarPolicy
     private final HotspotController.Callback mHotspotCallback = new HotspotController.Callback() {
         @Override
         public void onHotspotChanged(boolean enabled, int numDevices) {
-// QTI_BEGIN: 2020-04-22: WLAN: wifi: refactor Wi-Fi generation UI enhancements
-            mIconController.setIconVisibility(mSlotHotspot, enabled);
-        }
-        @Override
-        public void onHotspotChanged(boolean enabled, int numDevices, int standard) {
-            updateHotspotIcon(standard);
-// QTI_END: 2020-04-22: WLAN: wifi: refactor Wi-Fi generation UI enhancements
             mIconController.setIconVisibility(mSlotHotspot, enabled);
         }
     };
@@ -949,28 +923,6 @@ public class PhoneStatusBarPolicy
         }
     };
 
-// QTI_BEGIN: 2020-04-22: WLAN: wifi: refactor Wi-Fi generation UI enhancements
-    private void updateHotspotIcon(int standard) {
-        if (standard == ScanResult.WIFI_STANDARD_11AX) {
-// QTI_END: 2020-04-22: WLAN: wifi: refactor Wi-Fi generation UI enhancements
-            mIconController.setIcon(mSlotHotspot, R.drawable.stat_sys_wifi_6_hotspot,
-                mResources.getString(R.string.accessibility_status_bar_hotspot));
-// QTI_BEGIN: 2020-04-22: WLAN: wifi: refactor Wi-Fi generation UI enhancements
-        } else if (standard == ScanResult.WIFI_STANDARD_11AC) {
-// QTI_END: 2020-04-22: WLAN: wifi: refactor Wi-Fi generation UI enhancements
-            mIconController.setIcon(mSlotHotspot, R.drawable.stat_sys_wifi_5_hotspot,
-                mResources.getString(R.string.accessibility_status_bar_hotspot));
-// QTI_BEGIN: 2020-04-22: WLAN: wifi: refactor Wi-Fi generation UI enhancements
-        } else if (standard == ScanResult.WIFI_STANDARD_11N) {
-// QTI_END: 2020-04-22: WLAN: wifi: refactor Wi-Fi generation UI enhancements
-            mIconController.setIcon(mSlotHotspot, R.drawable.stat_sys_wifi_4_hotspot,
-                mResources.getString(R.string.accessibility_status_bar_hotspot));
-        } else {
-            mIconController.setIcon(mSlotHotspot, R.drawable.stat_sys_hotspot,
-                mResources.getString(R.string.accessibility_status_bar_hotspot));
-        }
-    }
-
     private void onConnectedDisplayAvailabilityChanged(ConnectedDisplayInteractor.State state) {
         boolean visible = state != ConnectedDisplayInteractor.State.DISCONNECTED;
 
@@ -980,17 +932,4 @@ public class PhoneStatusBarPolicy
 
         mIconController.setIconVisibility(mSlotConnectedDisplay, visible);
     }
-
-    private final FiveGServiceClient.AuxiliaryListener mAuxiliaryListener =
-            new FiveGServiceClient.AuxiliaryListener() {
-        @Override
-        public void onAuxiliaryRadioIconInfoChange(AuxiliaryRadioIconInfo auxIconInfo) {
-            mHandler.post(() -> {
-                Log.d(TAG, "onAuxiliaryRadioIconInfoChange: " + auxIconInfo.getDsdaCategory());
-                mIconController.setIconVisibility(mSlotTurboDsda,
-                    auxIconInfo.getDsdaCategory() == AuxiliaryRadioIconInfo.DSDA_CATEGORY_TURBO);
-                }
-            );
-        }
-    };
 }

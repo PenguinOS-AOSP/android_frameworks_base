@@ -16,7 +16,6 @@
 
 package android.hardware.camera2.impl;
 
-import static android.hardware.camera2.CameraAccessException.CAMERA_IN_USE;
 import static com.android.internal.util.function.pooled.PooledLambda.obtainRunnable;
 
 import android.annotation.FlaggedApi;
@@ -28,8 +27,6 @@ import android.compat.annotation.EnabledSince;
 import android.content.Context;
 import android.graphics.ImageFormat;
 import android.hardware.ICameraService;
-import android.app.ActivityThread;
-import android.graphics.ImageFormat;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -75,13 +72,14 @@ import android.os.Parcelable;
 import android.os.RemoteException;
 import android.os.ServiceSpecificException;
 import android.os.SystemClock;
-import android.os.SystemProperties;
-import android.text.TextUtils;
 import android.util.Log;
 import android.util.Range;
 import android.util.Size;
 import android.util.SparseArray;
 import android.view.Surface;
+import android.os.SystemProperties;
+import android.text.TextUtils;
+import android.app.ActivityThread;
 
 import com.android.internal.camera.flags.Flags;
 
@@ -123,7 +121,6 @@ public class CameraDeviceImpl extends CameraDevice
     };
 
     private static final int REQUEST_ID_NONE = -1;
-    private int customOpMode = 0;
 
     /**
      * Starting {@link Build.VERSION_CODES#VANILLA_ICE_CREAM},
@@ -191,6 +188,7 @@ public class CameraDeviceImpl extends CameraDevice
     private final Context mContext;
 
     private final boolean mForceMultiResolution;
+    private boolean mIsPrivilegedApp = false;
 
     private static final long NANO_PER_SECOND = 1000000000; //ns
 
@@ -213,7 +211,6 @@ public class CameraDeviceImpl extends CameraDevice
     private int mNextSessionId = 0;
 
     private final int mAppTargetSdkVersion;
-    private boolean mIsPrivilegedApp = false;
 
     private ExecutorService mOfflineSwitchService;
     private CameraOfflineSessionImpl mOfflineSessionImpl;
@@ -591,10 +588,6 @@ public class CameraDeviceImpl extends CameraDevice
         }
     }
 
-    public void setVendorStreamConfigMode(int fpsrange) {
-        customOpMode = fpsrange;
-    }
-
     @Override
     public String getId() {
         return mCameraId;
@@ -692,7 +685,6 @@ public class CameraDeviceImpl extends CameraDevice
                 }
 
                 InputConfiguration currentInputConfig = mConfiguredInput.getValue();
-                operatingMode = (operatingMode | (customOpMode << 16));
                 int offlineStreamIds[];
                 if (!Flags.configureStreamsBatch()) {
 
@@ -2163,14 +2155,6 @@ public class CameraDeviceImpl extends CameraDevice
                         inputConfig.getWidth() + "x" + inputConfig.getHeight() + " is not valid");
             }
         } else {
-            /*
-             * don't check input format and size,
-             * if the package name is in the white list
-             */
-            if (isPrivilegedApp()) {
-                Log.w(TAG, "ignore input format/size check for white listed app");
-                return;
-            }
             if (!checkInputConfigurationWithStreamConfigurations(inputConfig, /*maxRes*/false) &&
                     !checkInputConfigurationWithStreamConfigurations(inputConfig, /*maxRes*/true)) {
                 throw new IllegalArgumentException("Input config with format " +

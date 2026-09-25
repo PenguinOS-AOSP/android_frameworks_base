@@ -25,7 +25,6 @@ import android.media.MediaRouter.RouteInfo;
 import android.media.projection.StopReason;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.SystemProperties;
 import android.provider.Settings;
 import android.service.quicksettings.Tile;
 import android.text.TextUtils;
@@ -90,8 +89,6 @@ public class CastTile extends QSTileImpl<BooleanState> {
     private final ShadeDialogContextInteractor mShadeDialogContextInteractor;
     private boolean mCastTransportAllowed;
     private boolean mHotspotEnabled;
-    private static final String WFD_ENABLE = "persist.debug.wfd.enable";
-
     private final CastDetailsViewModel.Factory mCastDetailsViewModelFactory;
     private final DialogCreator mDialogCreator;
 

@@ -254,9 +254,6 @@ public class CameraServiceProxy extends SystemService
     private final ArrayMap<String, CameraUsageEvent> mActiveCameraUsage = new ArrayMap<>();
     private final List<CameraEvent> mCameraEventHistory = new ArrayList<CameraEvent>();
 
-    private static final String LIMIT_REFRESH_RATE_PROP = "debug.camera.limit_refresh_rate";
-    private final boolean mLimitRefreshRate;
-
     private static final String NFC_NOTIFICATION_PROP = "ro.camera.notify_nfc";
     private static final IBinder nfcInterfaceToken = new Binder();
 
@@ -1105,7 +1102,6 @@ public class CameraServiceProxy extends SystemService
         if (DEBUG) {
             Slogf.v(TAG, "Notify NFC behavior is %s", (mNotifyNfc ? "active" : "disabled"));
         }
-        mLimitRefreshRate = SystemProperties.getBoolean(LIMIT_REFRESH_RATE_PROP, true);
         mAllowMediaUid = mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_allowMediaUidForCameraServiceProxy);
         // Don't keep any extra logging threads if not needed
@@ -1607,7 +1603,7 @@ public class CameraServiceProxy extends SystemService
                     }
                     // If not already active, notify window manager about this new package using a
                     // camera
-                    if (!alreadyActivePackage && mLimitRefreshRate) {
+                    if (!alreadyActivePackage) {
                         WindowManagerInternal wmi =
                                 LocalServices.getService(WindowManagerInternal.class);
                         float minFps = getMinFps(cameraState);

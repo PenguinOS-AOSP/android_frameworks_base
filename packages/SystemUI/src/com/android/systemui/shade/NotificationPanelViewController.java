@@ -68,7 +68,6 @@ import android.graphics.Shader;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Trace;
-import android.util.BoostFramework;
 import android.util.IndentingPrintWriter;
 import android.util.Log;
 import android.util.MathUtils;
@@ -95,8 +94,6 @@ import com.android.internal.policy.SystemBarUtils;
 import com.android.internal.statusbar.IStatusBarService;
 import com.android.internal.util.LatencyTracker;
 import com.android.keyguard.ActiveUnlockConfig;
-import com.android.keyguard.EmergencyButton;
-import com.android.keyguard.EmergencyButtonController;
 import com.android.keyguard.KeyguardUnfoldTransition;
 import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.keyguard.dagger.KeyguardStatusBarViewComponent;
@@ -385,10 +382,6 @@ public final class NotificationPanelViewController implements
     private boolean mAnimateNextPositionUpdate;
     private final ScreenOffAnimationController mScreenOffAnimationController;
     private final UnlockedScreenOffAnimationController mUnlockedScreenOffAnimationController;
-
-    private final EmergencyButtonController.Factory mEmergencyButtonControllerFactory;
-    private EmergencyButtonController mEmergencyButtonController;
-
     private TrackingStartedListener mTrackingStartedListener;
     private OpenCloseListener mOpenCloseListener;
     private GestureRecorder mGestureRecorder;
@@ -601,7 +594,6 @@ public final class NotificationPanelViewController implements
     /**
      * For PanelView fling perflock call
      */
-    private BoostFramework mPerf = null;
 
     private final Runnable mFlingCollapseRunnable = () -> fling(0, false /* expand */,
             mNextCollapseSpeedUpFactor, false /* expandBecauseOfFalsing */);
@@ -687,7 +679,6 @@ public final class NotificationPanelViewController implements
             ActivityStarter activityStarter,
             SharedNotificationContainerInteractor sharedNotificationContainerInteractor,
             ActiveNotificationsInteractor activeNotificationsInteractor,
-            EmergencyButtonController.Factory emergencyButtonControllerFactory,
             NotifPipeline notifPipeline,
             KeyguardNotificationVisibilityProvider keyguardNotificationVisibilityProvider,
             ShadeAnimationInteractor shadeAnimationInteractor,
@@ -787,7 +778,6 @@ public final class NotificationPanelViewController implements
         mNotificationStackScrollLayoutController = notificationStackScrollLayoutController;
         mKeyguardStatusBarViewComponentFactory = keyguardStatusBarViewComponentFactory;
         mDepthController = notificationShadeDepthController;
-        mEmergencyButtonControllerFactory = emergencyButtonControllerFactory;
         mFragmentService = fragmentService;
         mStatusBarService = statusBarService;
         mSplitShadeStateController = splitShadeStateController;
@@ -884,7 +874,6 @@ public final class NotificationPanelViewController implements
                 });
         mAlternateBouncerInteractor = alternateBouncerInteractor;
         dumpManager.registerDumpable(this);
-        mPerf = new BoostFramework();
     }
 
     private void unlockAnimationFinished() {
@@ -1529,11 +1518,6 @@ public final class NotificationPanelViewController implements
                 }
             });
         }
-        if (mPerf != null) {
-            String currentPackage = mView.getContext().getPackageName();
-            mPerf.perfHint(BoostFramework.VENDOR_HINT_SCROLL_BOOST, currentPackage, -1,
-                    BoostFramework.Scroll.PANEL_VIEW);
-        }
         animator.addListener(new AnimatorListenerAdapter() {
             private boolean mCancelled;
 
@@ -1546,17 +1530,11 @@ public final class NotificationPanelViewController implements
 
             @Override
             public void onAnimationCancel(Animator animation) {
-                if (mPerf != null) {
-                    mPerf.perfLockRelease();
-                }
                 mCancelled = true;
             }
 
             @Override
             public void onAnimationEnd(Animator animation) {
-                if (mPerf != null) {
-                    mPerf.perfLockRelease();
-                }
                 if (shouldSpringBack && !mCancelled) {
                     // After the shade is flung open to an overscrolled state, spring back
                     // the shade by reducing section padding to 0.
