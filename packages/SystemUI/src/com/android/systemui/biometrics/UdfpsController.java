@@ -54,7 +54,6 @@ import android.os.Trace;
 import android.os.VibrationAttributes;
 import android.os.VibrationEffect;
 import android.provider.Settings;
-import android.util.BoostFramework;
 import android.util.Log;
 import android.view.HapticFeedbackConstants;
 import android.view.LayoutInflater;
@@ -234,10 +233,6 @@ public class UdfpsController implements DozeReceiver, Dumpable {
     private boolean mAttemptedToDismissKeyguard;
     private final Set<Callback> mCallbacks = new HashSet<>();
 
-    // Boostframework for UDFPS
-    private BoostFramework mPerf = null;
-    private boolean mIsPerfLockAcquired = false;
-    private static final int BOOST_DURATION_TIMEOUT = 2000;
     private boolean mDisableSmartPixels;
     private boolean mSmartPixelsFlag;
     private boolean mSmartPixelsEnabled;
@@ -827,7 +822,6 @@ public class UdfpsController implements DozeReceiver, Dumpable {
 
         udfpsHapticsSimulator.setUdfpsController(this);
         udfpsShell.setUdfpsOverlayController(mUdfpsOverlayController);
-        mPerf = new BoostFramework();
 
         mWakefulnessLifecycle = wakefulnessLifecycle.get();
         if (mWakefulnessLifecycle != null) {
@@ -922,13 +916,6 @@ public class UdfpsController implements DozeReceiver, Dumpable {
             }
         } else {
             Log.d(TAG, "showUdfpsOverlay | the overlay is already showing");
-        }
-
-        if (mPerf != null && !mIsPerfLockAcquired) {
-            mPerf.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
-                    null,
-                    BOOST_DURATION_TIMEOUT);
-            mIsPerfLockAcquired = true;
         }
     }
 
@@ -1238,11 +1225,6 @@ public class UdfpsController implements DozeReceiver, Dumpable {
         mOnFingerDown = false;
         unconfigureDisplay(view);
         cancelAodSendFingerUpAction();
-
-        if (mPerf != null && mIsPerfLockAcquired) {
-            mPerf.perfLockRelease();
-            mIsPerfLockAcquired = false;
-        }
     }
 
     /**
