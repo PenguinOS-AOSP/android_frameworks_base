@@ -42,6 +42,7 @@ import java.util.Map;
  *
  * These effects may be any number of things, from single shot vibrations to complex
  * waveforms, and to AAC extended effects.
+ * @hide
  */
 public final class RichTapVibrationEffect {
     private static final String TAG = RichTapVibrationEffect.class.getSimpleName();

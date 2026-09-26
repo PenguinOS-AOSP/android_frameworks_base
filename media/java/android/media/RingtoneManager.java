@@ -1271,7 +1271,7 @@ public class RingtoneManager {
         return getCacheForTypeBySlot(type, userId, SubscriptionManager.getDefaultVoicePhoneId());
     }
 
-    /** {@hide} */
+    /** @hide */
     public static Uri getCacheForTypeBySlot(int type, int userId, int slotId) {
         if ((type & TYPE_RINGTONE) != 0) {
             Uri ringtoneUri = slotId == 1

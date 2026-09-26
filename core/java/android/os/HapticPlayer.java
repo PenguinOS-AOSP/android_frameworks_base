@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Class for playing dynamic haptic effects using RichTap vibration technology.
+ * @hide
  */
 @SuppressLint("NotCloseable")
 public class HapticPlayer {

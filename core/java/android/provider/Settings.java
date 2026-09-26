@@ -6036,7 +6036,7 @@ public final class Settings {
          * @see #DEFAULT_RINGTONE2_URI
          *
          */
-        /** {@hide} */
+        /** @hide */
         public static final String RINGTONE2 = "ringtone2";
 
         /**
@@ -6056,7 +6056,7 @@ public final class Settings {
          * @see #DEFAULT_RINGTONE_URI
          *
          */
-        /** {@hide} */
+        /** @hide */
         public static final Uri DEFAULT_RINGTONE2_URI = getUriFor(RINGTONE2);
 
         /** @hide */
@@ -6064,9 +6064,9 @@ public final class Settings {
         /** @hide */
         public static final Uri RINGTONE_CACHE_URI = getUriFor(RINGTONE_CACHE);
 
-        /** {@hide} */
+        /** @hide */
         public static final String RINGTONE2_CACHE = "ringtone2_cache";
-        /** {@hide} */
+        /** @hide */
         public static final Uri RINGTONE2_CACHE_URI = getUriFor(RINGTONE2_CACHE);
 
         /**
@@ -6955,6 +6955,7 @@ public final class Settings {
         @Readable
         public static final String MULTI_AUDIO_FOCUS_ENABLED = "multi_audio_focus_enabled";
 
+        /** @hide */
         @Readable
         public static final String BT_WIRED_COPLAY_ENABLED = "bt_wired_coplay_enabled";
 

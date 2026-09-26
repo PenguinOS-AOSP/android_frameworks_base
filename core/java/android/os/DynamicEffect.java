@@ -26,6 +26,7 @@ import android.util.Log;
  * A DynamicEffect describes a haptic effect to be performed by a {@link Vibrator}.
  * <p>
  * This class allows creating vibration effects from JSON patterns.
+ * @hide
  */
 public final class DynamicEffect extends VibrationEffect implements Parcelable {
     public static final boolean DEBUG = true;

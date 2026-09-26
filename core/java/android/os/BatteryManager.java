@@ -176,14 +176,14 @@ public class BatteryManager {
     /**
      * Extra for {@link android.content.Intent#ACTION_BATTERY_CHANGED}:
      * Int value representing the estimated battery full charge capacity in microampere-hours.
-     * {@hide}
+     * @hide
      */
     public static final String EXTRA_MAXIMUM_CAPACITY = "android.os.extra.MAXIMUM_CAPACITY";
 
     /**
      * Extra for {@link android.content.Intent#ACTION_BATTERY_CHANGED}:
      * Int value representing the battery full charge design capacity in microampere-hours.
-     * {@hide}
+     * @hide
      */
     public static final String EXTRA_DESIGN_CAPACITY = "android.os.extra.DESIGN_CAPACITY";
 
@@ -290,7 +290,7 @@ public class BatteryManager {
 
     /**
      * boolean value to indicate OEM fast charging
-     * {@hide}
+     * @hide
      */
     public static final String EXTRA_OEM_FAST_CHARGING = "oem_fast_charging";
 
