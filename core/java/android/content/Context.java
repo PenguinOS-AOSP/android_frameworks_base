@@ -8237,7 +8237,7 @@ public abstract class Context {
      * @hide
      */
     @NonNull
-    @SystemApi
+    @SystemApi(client = SystemApi.Client.MODULE_LIBRARIES)
     @TestApi
     @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public @CanBeALL @CanBeCURRENT UserHandle getUser() {

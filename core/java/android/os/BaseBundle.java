@@ -2008,7 +2008,6 @@ public class BaseBundle implements Parcel.ClassLoaderProvider {
     }
 
     /** @hide */
-    @SystemApi
     @Nullable
     public <T extends Number> T getNumber(@NonNull String key) {
         // get{Boolean,Byte,Short,Int,Long,Float,Double}() methods do not distinguish between
@@ -2019,7 +2018,6 @@ public class BaseBundle implements Parcel.ClassLoaderProvider {
     }
 
     /**@hide */
-    @SystemApi
     @Nullable
     @SuppressLint("AutoBoxing")
     public Boolean getBoolean2(@NonNull String key) {
