@@ -2279,8 +2279,10 @@ public class AudioSystem
     /** @hide enables or disables the RTT mode. */
     public static native int setRttEnabled(boolean enabled);
 
+    /** @hide */
     public static native int setBtWiredCoPlayEnabled(boolean enabled);
 
+    /** @hide */
     public static native boolean isBtWiredCoPlayEnabled();
 
     /** @hide returns master balance value in range -1.f -> 1.f, where 0.f is dead center. */
