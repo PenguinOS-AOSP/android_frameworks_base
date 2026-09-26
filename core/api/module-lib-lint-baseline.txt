@@ -1787,3 +1787,7 @@ UnflaggedApi: android.os.IpcDataCache#MODULE_TELEPHONY:
     New API must be flagged with @FlaggedApi: field android.os.IpcDataCache.MODULE_TELEPHONY
 UnflaggedApi: android.provider.Settings.Config#getAllStrings():
     New API must be flagged with @FlaggedApi: method android.provider.Settings.Config.getAllStrings()
+UnflaggedApi: android.os.UserHandle#getUid(int, int):
+    New API must be flagged with @FlaggedApi: method android.os.UserHandle.getUid(int,int)
+UnflaggedApi: android.os.UserHandle#getUserId(int):
+    New API must be flagged with @FlaggedApi: method android.os.UserHandle.getUserId(int)
